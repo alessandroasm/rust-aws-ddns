@@ -1,2 +1,4 @@
 /target
 /*.csv
+/*.yml
+.swp

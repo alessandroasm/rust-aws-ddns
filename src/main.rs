@@ -6,6 +6,9 @@ use aws_credentials::AppAwsCredentials;
 mod ip_address;
 use ip_address::MyIpProvider;
 
+mod config;
+mod route53_client;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let clap_matches = App::new("rust-aws-ddns")
@@ -14,26 +17,75 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .about("This application configures the current IP Address on AWS Route 53")
         .args_from_usage(
             "-c, --config=[FILE] 'Sets a custom config file'
-            --csv=[FILE]         'Sets a custom config file'
+            --csv=[FILE]         'Sets a custom credentials file'
             -v                   'Verbose mode'",
         )
         .get_matches();
+
+    // Load configuration
+    let config_file = clap_matches
+        .value_of("config")
+        .unwrap_or("rust-aws-ddns.yml");
+    let app_config = config::AppConfig::parse(config_file);
+    println!("Config: {:?}", &app_config);
 
     // Get API credentials
     let mut credentials: Option<AppAwsCredentials> = None;
     credentials = aws_credentials::from_csv("aws_user_credentials.csv");
 
-    if credentials.is_none() {
-        panic!("No AWS credentials found");
+    // if credentials.is_none() {
+    //     panic!("No AWS credentials found");
+    // }
+
+    // Checking and updating IPs
+    let route53_client = route53_client::Route53Client::new(credentials);
+    let app_config = app_config.unwrap();
+
+    // IPv4 First
+    if app_config.update_ipv4 {
+        let provider_str = if app_config.provider_v4.is_none() {
+            ""
+        } else {
+            app_config.provider_v4.as_ref().unwrap()
+        };
+        let provider = match provider_str.as_ref() {
+            "httpbin" => MyIpProvider::Httpbin,
+            _ => MyIpProvider::Ipify,
+        };
+
+        let record_set = app_config.record_set.as_ref();
+        update_record_set(&app_config, &route53_client, provider, record_set)
+            .await?;
     }
 
+    // And then IPv6
+    if app_config.update_ipv6 {
+        let provider = MyIpProvider::IpifyV6;
+        let record_set: &str = app_config
+            .record_set_v6
+            .as_ref()
+            .unwrap_or(&app_config.record_set);
+
+        update_record_set(&app_config, &route53_client, provider, record_set)
+            .await?;
+    }
+
+    Ok(())
+}
+
+async fn update_record_set(
+    config: &config::AppConfig,
+    client: &route53_client::Route53Client,
+    ip_provider: MyIpProvider,
+    record_set: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Get current IP Address
-    let my_ipaddr = ip_address::current(MyIpProvider::Ipify).await?;
-    if !my_ipaddr.is_ipv4() {
-        panic!("The application only supports IPv4");
-    }
+    let my_ipaddr = ip_address::current(ip_provider).await?;
+    //client.list_hosted_zones().await;
 
-    println!("matches: {:?}", &clap_matches);
-    println!("ip: {:?}", &my_ipaddr);
+    client
+        .set_ip_address(&config.zone_id, record_set, &my_ipaddr)
+        .await;
+
     Ok(())
 }

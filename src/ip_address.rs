@@ -3,11 +3,17 @@ use std::net::IpAddr;
 
 pub enum MyIpProvider {
     Ipify,
+    IpifyV6,
     Httpbin,
 }
 
-async fn execute_ipify() -> Result<IpAddr, Box<dyn std::error::Error>> {
-    let resp = reqwest::get("https://api.ipify.org?format=json")
+async fn execute_ipify(v6: bool) -> Result<IpAddr, Box<dyn std::error::Error>> {
+    let url = if v6 {
+        "https://api6.ipify.org?format=json"
+    } else {
+        "https://api.ipify.org?format=json"
+    };
+    let resp = reqwest::get(url)
         .await?
         .json::<HashMap<String, String>>()
         .await?;
@@ -40,7 +46,8 @@ pub async fn current(
     provider: MyIpProvider,
 ) -> Result<IpAddr, Box<dyn std::error::Error>> {
     match provider {
-        MyIpProvider::Ipify => execute_ipify().await,
+        MyIpProvider::Ipify => execute_ipify(false).await,
+        MyIpProvider::IpifyV6 => execute_ipify(true).await,
         MyIpProvider::Httpbin => execute_httpbin().await,
     }
 }
