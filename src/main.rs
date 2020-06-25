@@ -4,14 +4,14 @@ mod aws_credentials;
 use aws_credentials::AppAwsCredentials;
 
 mod ip_address;
+use ip_address::MyIpProvider;
 
-type AppResult<T> = Result<T, std::boxed::Box<dyn std::error::Error>>;
-
-fn main() -> AppResult<()> {
-    let clap_matches = App::new("rust-server-stats-gatherer")
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let clap_matches = App::new("rust-aws-ddns")
         .version("0.1")
         .author("Alessandro Menezes <alessandroasm@gmail.com>")
-        .about("This application gathers stats from several hosts using SSH")
+        .about("This application configures the current IP Address on AWS Route 53")
         .args_from_usage(
             "-c, --config=[FILE] 'Sets a custom config file'
             --csv=[FILE]         'Sets a custom config file'
@@ -28,8 +28,12 @@ fn main() -> AppResult<()> {
     }
 
     // Get current IP Address
-    ip_address::current();
+    let my_ipaddr = ip_address::current(MyIpProvider::Ipify).await?;
+    if !my_ipaddr.is_ipv4() {
+        panic!("The application only supports IPv4");
+    }
 
     println!("matches: {:?}", &clap_matches);
+    println!("ip: {:?}", &my_ipaddr);
     Ok(())
 }

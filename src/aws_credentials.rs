@@ -1,5 +1,4 @@
-
-use serde::{Deserialize};
+use serde::Deserialize;
 
 pub struct AppAwsCredentials {
     pub access_key: String,
@@ -29,10 +28,9 @@ pub fn from_csv(csv_file: &str) -> Option<AppAwsCredentials> {
 
     let mut csv_rdr = csv::Reader::from_reader(csv_file);
     for row in csv_rdr.deserialize::<AwsCsvEntry>() {
-
         if let Ok(record) = row {
             println!("Record: {:?}", record);
-            return Some(AppAwsCredentials{
+            return Some(AppAwsCredentials {
                 access_key: record.access_key,
                 secret_access_key: record.secret_access_key,
             });
