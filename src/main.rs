@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             app_config.provider_v4.as_ref().unwrap()
         };
-        let provider = match provider_str.as_ref() {
+        let provider = match provider_str {
             "httpbin" => MyIpProvider::Httpbin,
             _ => MyIpProvider::Ipify,
         };

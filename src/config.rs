@@ -45,7 +45,8 @@ impl AppConfig {
             let aws_access_key = read_line();
             let aws_access_key = String::from(aws_access_key.trim());
 
-            let (aws_access_key, aws_secret_key) = if aws_access_key.len() > 0 {
+            let (aws_access_key, aws_secret_key) = if !aws_access_key.is_empty()
+            {
                 print!("AWS Secret Key: ");
                 let secret_key = read_line();
                 let secret_key = String::from(secret_key.trim());
@@ -65,7 +66,7 @@ impl AppConfig {
                 let secret_key = String::from(aws_secret_key.as_ref().unwrap());
 
                 Some(crate::aws_credentials::AppAwsCredentials {
-                    access_key: access_key,
+                    access_key,
                     secret_access_key: secret_key,
                 })
             };
@@ -80,7 +81,7 @@ impl AppConfig {
             }
 
             let hosted_zones = hosted_zones.unwrap();
-            if hosted_zones.len() == 0 {
+            if hosted_zones.is_empty() {
                 panic!("There are no configured Hosted Zones on this Route 53 account. Please create a hosted zone and run this application again.");
             }
 
@@ -119,29 +120,30 @@ impl AppConfig {
             let record_set_v4 =
                 format!("{}.{}", record_set_v4, hosted_zone_name);
 
-            let mut record_set_v6: Option<String> = None;
-            if update_ipv6 {
+            let record_set_v6 = if update_ipv6 {
                 print!("IPv6 record set prefix (xxx.{}): ", hosted_zone_name);
                 let record_set_v6_str = read_line().trim().to_lowercase();
 
-                record_set_v6 = if record_set_v6_str.len() == 0 {
+                if record_set_v6_str.is_empty() {
                     None
                 } else {
                     Some(format!("{}.{}", record_set_v6_str, hosted_zone_name))
-                };
-            }
+                }
+            } else {
+                None
+            };
 
             // Write configuration out
             let config = AppConfig {
                 zone_id: String::from(hosted_zone_id),
                 record_set: record_set_v4,
-                record_set_v6: record_set_v6,
-                update_ipv4: update_ipv4,
-                update_ipv6: update_ipv6,
+                record_set_v6,
+                update_ipv4,
+                update_ipv6,
 
                 provider_v4: None,
 
-                aws_access_key: aws_access_key,
+                aws_access_key,
                 aws_secret_access_key: aws_secret_key,
             };
 
@@ -187,7 +189,7 @@ fn read_non_blank_line(prompt: &str) -> String {
         let line = read_line();
         let line = line.trim();
 
-        if line.len() > 0 {
+        if !line.is_empty() {
             return String::from(line);
         }
     }
