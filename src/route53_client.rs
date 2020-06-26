@@ -15,11 +15,24 @@ impl Route53Client {
     }
 
     fn new_client(&self) -> AwsRoute53Client {
-        let client = AwsRoute53Client::new(Region::UsEast1);
-        client
+        let region = Region::UsEast1;
+        match &self.credentials {
+            Some(cred) => {
+                let dispatcher = rusoto_core::HttpClient::new()
+                    .expect("Failed to create Rusoto HTTP Client");
+                let provider = rusoto_core::credential::StaticProvider::new(
+                    String::from(&cred.access_key),
+                    String::from(&cred.secret_access_key),
+                    None,
+                    None,
+                );
+                AwsRoute53Client::new_with(dispatcher, provider, region)
+            }
+            _ => AwsRoute53Client::new(region),
+        }
     }
 
-    pub async fn list_hosted_zones(&self) {
+    pub async fn list_hosted_zones(&self) -> Option<Vec<(String, String)>> {
         let client = self.new_client();
 
         let request = rusoto_route53::ListHostedZonesRequest {
@@ -27,8 +40,21 @@ impl Route53Client {
             marker: None,
             max_items: None,
         };
-        let result = client.list_hosted_zones(request).await.unwrap();
-        println!("res: {:?}", &result);
+
+        let result = client.list_hosted_zones(request).await;
+        match result {
+            Err(_) => None,
+            Ok(res) => {
+                let v = res
+                    .hosted_zones
+                    .iter()
+                    .map(|zone| {
+                        (String::from(&zone.id), String::from(&zone.name))
+                    })
+                    .collect();
+                Some(v)
+            }
+        }
     }
 
     pub async fn set_ip_address(

@@ -24,9 +24,12 @@ struct AwsCsvEntry {
 }
 
 pub fn from_csv(csv_file: &str) -> Option<AppAwsCredentials> {
-    let csv_file = std::fs::File::open(csv_file).unwrap();
+    let csv_file = std::fs::File::open(csv_file);
+    if csv_file.is_err() {
+        return None;
+    }
 
-    let mut csv_rdr = csv::Reader::from_reader(csv_file);
+    let mut csv_rdr = csv::Reader::from_reader(csv_file.unwrap());
     for row in csv_rdr.deserialize::<AwsCsvEntry>() {
         if let Ok(record) = row {
             println!("Record: {:?}", record);

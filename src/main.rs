@@ -1,7 +1,6 @@
 use clap::App;
 
 mod aws_credentials;
-use aws_credentials::AppAwsCredentials;
 
 mod ip_address;
 use ip_address::MyIpProvider;
@@ -27,19 +26,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .value_of("config")
         .unwrap_or("rust-aws-ddns.yml");
     let app_config = config::AppConfig::parse(config_file);
-    println!("Config: {:?}", &app_config);
+    let app_config = app_config.await.unwrap();
 
     // Get API credentials
-    let mut credentials: Option<AppAwsCredentials> = None;
-    credentials = aws_credentials::from_csv("aws_user_credentials.csv");
+    let credentials_file = clap_matches
+        .value_of("csv")
+        .unwrap_or("aws_user_credentials.csv");
+    let mut credentials = aws_credentials::from_csv(credentials_file);
 
-    // if credentials.is_none() {
-    //     panic!("No AWS credentials found");
-    // }
+    if credentials.is_none()
+        && app_config.aws_access_key.is_some()
+        && app_config.aws_secret_access_key.is_some()
+    {
+        let access_key = app_config.aws_access_key.as_ref().unwrap();
+        let secret_access_key =
+            app_config.aws_secret_access_key.as_ref().unwrap();
+
+        credentials = Some(aws_credentials::AppAwsCredentials {
+            access_key: String::from(access_key),
+            secret_access_key: String::from(secret_access_key),
+        });
+    }
 
     // Checking and updating IPs
     let route53_client = route53_client::Route53Client::new(credentials);
-    let app_config = app_config.unwrap();
 
     // IPv4 First
     if app_config.update_ipv4 {
@@ -81,7 +91,6 @@ async fn update_record_set(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Get current IP Address
     let my_ipaddr = ip_address::current(ip_provider).await?;
-    //client.list_hosted_zones().await;
 
     client
         .set_ip_address(&config.zone_id, record_set, &my_ipaddr)
