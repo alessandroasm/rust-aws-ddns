@@ -15,7 +15,10 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    pub async fn parse(config_file: &str) -> Option<Self> {
+    pub async fn parse(
+        config_file: &str,
+        is_in_quiet_mode: bool,
+    ) -> Option<Self> {
         // Opening and parsing the configuration file
         let f = std::fs::File::open(config_file);
         if let Err(io_err) = f {
@@ -23,6 +26,10 @@ impl AppConfig {
 
             return match io_err.kind() {
                 ErrorKind::NotFound => {
+                    if is_in_quiet_mode {
+                        panic!("Configuration file not found!");
+                    }
+
                     println!(
                         "Config file not found! Starting configuration wizard\n"
                     );

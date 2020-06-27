@@ -8,6 +8,15 @@ use ip_address::MyIpProvider;
 mod config;
 mod route53_client;
 
+static mut QUIET_MODE: bool = false;
+fn println(message: &str) {
+    unsafe {
+        if !QUIET_MODE {
+            println!("{}", message);
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let clap_matches = App::new("rust-aws-ddns")
@@ -17,15 +26,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .args_from_usage(
             "-c, --config=[FILE] 'Sets a custom config file'
             --csv=[FILE]         'Sets a custom credentials file'
-            -v                   'Verbose mode'",
+            -v                   'Verbose mode'
+            -q                   'Quiet mode'",
         )
         .get_matches();
 
     // Load configuration
+    let quiet_mode = clap_matches.is_present("q");
+    unsafe {
+        QUIET_MODE = quiet_mode;
+    }
+
     let config_file = clap_matches
         .value_of("config")
         .unwrap_or("rust-aws-ddns.yml");
-    let app_config = config::AppConfig::parse(config_file);
+    let app_config = config::AppConfig::parse(config_file, quiet_mode);
     let app_config = app_config.await.unwrap();
 
     // Get API credentials

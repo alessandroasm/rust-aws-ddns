@@ -63,7 +63,7 @@ impl Route53Client {
         record_set: &str,
         ip: &IpAddr,
     ) {
-        println!("Updating \"{}\" to {}", record_set, ip);
+        crate::println(&format!("Updating \"{}\" to {}", record_set, ip));
 
         let client = self.new_client();
         let (is_recordset_present, is_recordset_uptodate) =
@@ -71,18 +71,17 @@ impl Route53Client {
 
         // Already up to date, nothing to do
         if is_recordset_present && is_recordset_uptodate {
-            println!("   {} is already up to date.", record_set);
+            crate::println(&format!(
+                "   {} is already up to date.",
+                record_set
+            ));
             return;
         }
 
         // We need to update / create the recordset
         update_record_set(&client, zone_id, record_set, ip).await;
-        println!("   {} was updated.", record_set);
+        crate::println(&format!("   {} was updated.", record_set));
     }
-
-    // pub fn get_hosted_zone(&self) {
-    //     // GET /2013-04-01/hostedzone/Id HTTP/1.1
-    // }
 }
 
 async fn check_record_set(
