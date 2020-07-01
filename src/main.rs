@@ -8,6 +8,8 @@ use ip_address::MyIpProvider;
 mod config;
 mod route53_client;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 static mut QUIET_MODE: bool = false;
 fn println(message: &str) {
     unsafe {
@@ -20,13 +22,12 @@ fn println(message: &str) {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let clap_matches = App::new("rust-aws-ddns")
-        .version("0.1")
+        .version(VERSION)
         .author("Alessandro Menezes <alessandroasm@gmail.com>")
-        .about("This application configures the current IP Address on AWS Route 53")
+        .about("This application implements DDNS backed by AWS Route 53")
         .args_from_usage(
             "-c, --config=[FILE] 'Sets a custom config file'
             --csv=[FILE]         'Sets a custom credentials file'
-            -v                   'Verbose mode'
             -q                   'Quiet mode'",
         )
         .get_matches();
