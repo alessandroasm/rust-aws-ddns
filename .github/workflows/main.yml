@@ -20,12 +20,25 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
 
+    # Install latest stable rustc
+    - name: Install latest stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: rustfmt, clippy
+
     # Running cargo clippy
     - name: Clippy
-      run: cargo clippy
+      uses: actions-rs/cargo@v1
+      with:
+        command: clippy
 
     # Compiling
     - name: Compile
-      run: cargo build --verbose
       env:
         RUSTFLAGS: -Dwarnings
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --verbose
