@@ -1,4 +1,5 @@
 use clap::App;
+use std::net::{IpAddr, ToSocketAddrs};
 
 mod aws_credentials;
 
@@ -108,9 +109,45 @@ async fn update_record_set(
     // Get current IP Address
     let my_ipaddr = ip_address::current(ip_provider).await?;
 
-    client
-        .set_ip_address(&config.zone_id, record_set, &my_ipaddr)
-        .await;
+    // Checking if we need to update the recordset
+    let force_update = !config.check_before_updating.unwrap_or(true);
+    if force_update || !is_record_set_up_to_date(record_set, &my_ipaddr).await?
+    {
+        // Updating records
+        client
+            .set_ip_address(&config.zone_id, record_set, &my_ipaddr)
+            .await;
+    } else {
+        // The recordset is already correct; nothing to do
+        let s = format!("{} is up to date.", record_set);
+        println(&s);
+    }
 
     Ok(())
+}
+
+async fn is_record_set_up_to_date(
+    record_set: &str,
+    ip: &IpAddr,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    // We need to copy the parameters in order to move them into the closure
+    let record_set = record_set.to_string();
+    let ip = *ip;
+
+    // Spawning the blocking task
+    let res = tokio::task::spawn_blocking(move || {
+        // We need to use a port to resolve an address, so we are picking port
+        // 80
+        let ips = (record_set, 80).to_socket_addrs();
+        match ips {
+            // We are ignoring any DNS errors; this way the recordset will be
+            // updated if we have any errors
+            Err(_) => false,
+
+            Ok(mut ips) => ips.any(|ip_addr| ip_addr.ip() == ip),
+        }
+    })
+    .await;
+
+    Ok(res.unwrap_or(false))
 }

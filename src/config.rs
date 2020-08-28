@@ -7,6 +7,7 @@ pub struct AppConfig {
     pub record_set_v6: Option<String>,
     pub update_ipv4: bool,
     pub update_ipv6: bool,
+    pub check_before_updating: Option<bool>,
 
     pub provider_v4: Option<String>,
 
@@ -147,6 +148,7 @@ impl AppConfig {
                 record_set_v6,
                 update_ipv4,
                 update_ipv6,
+                check_before_updating: Some(true),
 
                 provider_v4: None,
 
