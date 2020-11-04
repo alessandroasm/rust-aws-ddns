@@ -1,3 +1,4 @@
+use crate::MyIpProvider;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -43,6 +44,20 @@ impl AppConfig {
         let f = f.unwrap();
         let config: AppConfig = serde_yaml::from_reader(f).unwrap();
         Some(config)
+    }
+
+    pub fn get_provider(&self) -> MyIpProvider {
+        let provider_str = if self.provider_v4.is_none() {
+            ""
+        } else {
+            self.provider_v4.as_ref().unwrap()
+        };
+
+        match provider_str {
+            "httpbin" => MyIpProvider::Httpbin,
+            "identme" => MyIpProvider::IdentMe,
+            _ => MyIpProvider::Ipify,
+        }
     }
 
     /// Starts a wizard to generate a valid configuration file

@@ -69,32 +69,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let route53_client = route53_client::Route53Client::new(credentials);
 
     // IPv4 First
+    let provider_v4 = app_config.get_provider();
     if app_config.update_ipv4 {
-        let provider_str = if app_config.provider_v4.is_none() {
-            ""
-        } else {
-            app_config.provider_v4.as_ref().unwrap()
-        };
-        let provider = match provider_str {
-            "httpbin" => MyIpProvider::Httpbin,
-            _ => MyIpProvider::Ipify,
-        };
-
         let record_set = app_config.record_set.as_ref();
-        update_record_set(&app_config, &route53_client, provider, record_set)
-            .await?;
+        update_record_set(
+            &app_config,
+            &route53_client,
+            &provider_v4,
+            record_set,
+        )
+        .await?;
     }
 
     // And then IPv6
     if app_config.update_ipv6 {
-        let provider = MyIpProvider::IpifyV6;
+        let provider_v6 = if provider_v4 == MyIpProvider::IdentMe {
+            MyIpProvider::IdentMeV6
+        } else {
+            MyIpProvider::IpifyV6
+        };
         let record_set: &str = app_config
             .record_set_v6
             .as_ref()
             .unwrap_or(&app_config.record_set);
 
-        update_record_set(&app_config, &route53_client, provider, record_set)
-            .await?;
+        update_record_set(
+            &app_config,
+            &route53_client,
+            &provider_v6,
+            record_set,
+        )
+        .await?;
     }
 
     Ok(())
@@ -103,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn update_record_set(
     config: &config::AppConfig,
     client: &route53_client::Route53Client,
-    ip_provider: MyIpProvider,
+    ip_provider: &MyIpProvider,
     record_set: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Get current IP Address
