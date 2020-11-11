@@ -1,13 +1,99 @@
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt;
 use std::net::IpAddr;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub enum MyIpProvider {
     Ipify,
     IpifyV6,
     Httpbin,
     IdentMe,
     IdentMeV6,
+}
+
+#[derive(Debug)]
+pub struct IpAddressResolutionError {
+    message: String,
+}
+impl fmt::Display for IpAddressResolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Error on IP Address resolution: {}", self.message)
+    }
+}
+impl Error for IpAddressResolutionError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
+}
+
+/// Information about a provider
+struct ProviderInfo {
+    pub provider: MyIpProvider,
+    pub name: &'static str,
+    pub is_v6: bool,
+}
+
+lazy_static! {
+    static ref PROVIDERS_INFO: Vec<ProviderInfo> = vec![
+        ProviderInfo {
+            provider: MyIpProvider::Ipify,
+            name: "ipify",
+            is_v6: false,
+        },
+        ProviderInfo {
+            provider: MyIpProvider::IpifyV6,
+            name: "ipify",
+            is_v6: true,
+        },
+        ProviderInfo {
+            provider: MyIpProvider::Httpbin,
+            name: "httpbin",
+            is_v6: false,
+        },
+        ProviderInfo {
+            provider: MyIpProvider::IdentMe,
+            name: "identme",
+            is_v6: false,
+        },
+        ProviderInfo {
+            provider: MyIpProvider::IdentMeV6,
+            name: "identme",
+            is_v6: true,
+        },
+    ];
+}
+
+/// Returns true if provider is IPv6
+fn is_provider_v6(provider: &MyIpProvider) -> bool {
+    let provider_info = PROVIDERS_INFO
+        .iter()
+        .find(|&info| info.provider == *provider)
+        .expect("Unknown provider type");
+    provider_info.is_v6
+}
+
+/// Returns an interator of providers
+/// The first item will be the specified provider, followed by alternative ones.
+fn find_provider_with_alternatives(
+    provider: &MyIpProvider,
+) -> Vec<MyIpProvider> {
+    let is_v6 = is_provider_v6(provider);
+
+    let mut providers = vec![*provider];
+    let mut alternatives: Vec<MyIpProvider> = PROVIDERS_INFO
+        .iter()
+        .filter_map(|candidate| {
+            if candidate.is_v6 == is_v6 && &candidate.provider != provider {
+                Some(candidate.provider)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    providers.append(&mut alternatives);
+    providers
 }
 
 async fn execute_ipify(v6: bool) -> Result<IpAddr, Box<dyn std::error::Error>> {
@@ -64,16 +150,34 @@ async fn execute_identme(
     }
 }
 
+/// Returns the current public ip address
+/// This function will try alternatives if the specified provider isn't available.
 pub async fn current(
     provider: &MyIpProvider,
 ) -> Result<IpAddr, Box<dyn std::error::Error>> {
-    match provider {
-        MyIpProvider::Ipify => execute_ipify(false).await,
-        MyIpProvider::IpifyV6 => execute_ipify(true).await,
-        MyIpProvider::Httpbin => execute_httpbin().await,
-        MyIpProvider::IdentMe => execute_identme(false).await,
-        MyIpProvider::IdentMeV6 => execute_identme(true).await,
+    let providers_to_try = find_provider_with_alternatives(provider);
+    for provider in providers_to_try.iter() {
+        let res = match provider {
+            MyIpProvider::Ipify => execute_ipify(false).await,
+            MyIpProvider::IpifyV6 => execute_ipify(true).await,
+            MyIpProvider::Httpbin => execute_httpbin().await,
+            MyIpProvider::IdentMe => execute_identme(false).await,
+            MyIpProvider::IdentMeV6 => execute_identme(true).await,
+        };
+
+        if res.is_ok() {
+            return res;
+        }
     }
+
+    let providers_tried: Vec<String> = providers_to_try
+        .into_iter()
+        .map(|p| format!("{:?}", p))
+        .collect();
+    let ex = IpAddressResolutionError {
+        message: format!("providers tried: {}", providers_tried.join(", ")),
+    };
+    Err(Box::new(ex))
 }
 
 #[cfg(test)]
@@ -100,5 +204,20 @@ mod ip_tests {
 
         let ipv6 = super::execute_identme(true).await.unwrap();
         println!("IPv6: {}", ipv6);
+    }
+
+    #[test]
+    fn provider_alternatives() {
+        use super::{ find_provider_with_alternatives, MyIpProvider };
+
+        let alts = find_provider_with_alternatives(&MyIpProvider::Httpbin);
+        assert_eq!(MyIpProvider::Httpbin, alts[0]);
+        assert!(alts.contains(&MyIpProvider::Ipify));
+        assert!(!alts.contains(&MyIpProvider::IpifyV6));
+
+        let alts = find_provider_with_alternatives(&MyIpProvider::IdentMeV6);
+        assert_eq!(MyIpProvider::IdentMeV6, alts[0]);
+        assert!(alts.contains(&MyIpProvider::IpifyV6));
+        assert!(!alts.contains(&MyIpProvider::IdentMe));
     }
 }

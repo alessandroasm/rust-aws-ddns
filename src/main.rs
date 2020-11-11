@@ -9,6 +9,9 @@ use ip_address::MyIpProvider;
 mod config;
 mod route53_client;
 
+#[macro_use]
+extern crate lazy_static;
+
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 static mut QUIET_MODE: bool = false;
