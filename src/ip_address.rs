@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::net::IpAddr;
+use std::process::Command;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum MyIpProvider {
@@ -180,6 +181,25 @@ pub async fn current(
     Err(Box::new(ex))
 }
 
+/// Checks if we have IPv6 connectivity
+pub fn is_ipv6_available() -> bool {
+    let ip_out = Command::new("ip").args(&["-6", "addr"]).output();
+
+    if let Ok(ip_out) = ip_out {
+        if !ip_out.status.success() {
+            return false;
+        }
+
+        return String::from_utf8_lossy(&ip_out.stdout)
+            .lines()
+            .filter(|&s| s.contains("scope global"))
+            .count()
+            > 0;
+    }
+
+    false
+}
+
 #[cfg(test)]
 mod ip_tests {
     #[tokio::test]
@@ -208,7 +228,7 @@ mod ip_tests {
 
     #[test]
     fn provider_alternatives() {
-        use super::{ find_provider_with_alternatives, MyIpProvider };
+        use super::{find_provider_with_alternatives, MyIpProvider};
 
         let alts = find_provider_with_alternatives(&MyIpProvider::Httpbin);
         assert_eq!(MyIpProvider::Httpbin, alts[0]);

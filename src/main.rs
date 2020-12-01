@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // And then IPv6
-    if app_config.update_ipv6 {
+    if app_config.update_ipv6 && ip_address::is_ipv6_available() {
         let provider_v6 = if provider_v4 == MyIpProvider::IdentMe {
             MyIpProvider::IdentMeV6
         } else {
